@@ -76,6 +76,13 @@ export interface ThreadTitleGenerationResult {
 
 /** Commit, change request, branch, and title generation backed by one provider instance. */
 export interface ProviderTextGeneration {
+  /** Independent, tool-free question answering; omitted when the runtime cannot enforce it. */
+  readonly generateSideQuestion?: (input: {
+    readonly cwd: string;
+    readonly question: string;
+    readonly context: string;
+    readonly modelSelection: ModelSelection;
+  }) => Effect.Effect<{ readonly answer: string }, TextGenerationError>;
   /**
    * Generate a commit message from staged change context.
    */

@@ -288,3 +288,20 @@ it.effect("rejects protected unary and streamed RPCs outside a guarded command",
     expect(writes).toBe(0);
   }),
 );
+
+it.effect("side questions require the destination environment's operate grant", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      const questions = createCommandPermissions(runtime, WS_METHODS.threadSideQuestion);
+      registry.set(sessions(env), AsyncResult.success(grant(true)));
+      registry.set(sessions(other), AsyncResult.success(grant(false)));
+      expect(registry.get(questions.permissionAtom(env))).toBe(true);
+      expect(registry.get(questions.permissionAtom(other))).toBe(false);
+      yield* questions.authorize(registry, env);
+      expect(
+        (yield* questions.authorize(registry, other).pipe(Effect.flip)).requiredPermission,
+      ).toBe(AuthOrchestrationOperateScope);
+    }),
+  ),
+);
