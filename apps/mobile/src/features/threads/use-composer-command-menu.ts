@@ -102,10 +102,26 @@ export function buildComposerSlashCommandItems(input: {
     (item) => item.command.includes(query) && (item.command === "model" || allowInteractionMode),
   );
 
+  if (
+    input.hasThread &&
+    input.selectedProviderStatus?.driver === "claudeAgent" &&
+    input.atMessageStart &&
+    "btw".includes(query)
+  ) {
+    items.push({
+      id: "cmd:btw",
+      type: "slash-command",
+      command: "btw",
+      label: "/btw",
+      description: "Ask a side question without interrupting the task",
+    });
+  }
+
   // Providers expand commands only at the start of a message. T3 commands
   // change local state and do not have this restriction.
   if (!input.atMessageStart) return items;
   for (const command of input.selectedProviderStatus?.slashCommands ?? []) {
+    if (command.name.toLowerCase() === "btw") continue;
     if (!command.name.toLowerCase().includes(query)) continue;
     if (command.name === "compact" && !input.hasCompactableConversation) continue;
     // T3's own limits command is answered by the thread composer; New Task has

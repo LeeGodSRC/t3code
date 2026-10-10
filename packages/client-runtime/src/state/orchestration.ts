@@ -1,4 +1,4 @@
-import { ORCHESTRATION_V2_WS_METHODS } from "@t3tools/contracts";
+import { ORCHESTRATION_V2_WS_METHODS, WS_METHODS } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 
 import {
@@ -12,6 +12,10 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | R, E>,
 ) {
   return {
+    sideQuestion: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:side-question",
+      tag: WS_METHODS.threadSideQuestion,
+    }),
     v2: {
       dispatchCommand: createEnvironmentRpcCommand(runtime, {
         label: "environment-data:orchestration-v2:dispatch-command",

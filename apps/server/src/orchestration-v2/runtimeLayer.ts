@@ -1,3 +1,4 @@
+import * as ThreadSideQuestion from "./ThreadSideQuestion.ts";
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as Layer from "effect/Layer";
@@ -330,6 +331,9 @@ const layerMcpAppRequestsProvided = McpAppRequests.layer.pipe(
 );
 
 export const layer = Layer.mergeAll(
+  ThreadSideQuestion.layer.pipe(
+    Layer.provide(Layer.mergeAll(layerThreadManagementProvided, ProjectStore.layer)),
+  ),
   layerOrchestratorProvided,
   layerMcpAppRequestsProvided,
   layerThreadManagementProvided,

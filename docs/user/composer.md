@@ -191,6 +191,19 @@ you had typed in the composer before starting the edit is restored afterwards. I
 message starts or is removed while you are editing, the edit ends: changed content moves into the
 composer when it is empty, and is discarded otherwise.
 
+## Side questions
+
+In a Claude Code conversation, click **BTW** beside the message input or send
+`/btw your question` to ask about the current
+conversation without interrupting the agent or adding the question and answer to
+its history. Send `/btw` alone to open the question form. Close the answer when
+you are done.
+
+Side questions use the conversation’s text and cannot call tools or inspect new
+files. Long conversations include only recent text, with a notice in the answer.
+Each question is independent and uses the thread’s selected model and account.
+This is available on web, desktop, and mobile; other providers are not yet supported.
+
 ## Commands and skills
 
 Type `/` for commands or `$` to add a skill from the selected environment and

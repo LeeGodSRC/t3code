@@ -1,3 +1,4 @@
+import { SideQuestionInput, SideQuestionResult, SideQuestionError } from "./sideQuestion.ts";
 import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
@@ -363,6 +364,7 @@ import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
 
 export const WS_METHODS = {
+  threadSideQuestion: "threads.sideQuestion",
   // Project registry methods
   projectsList: "projects.list",
   projectsAdd: "projects.add",
@@ -1575,6 +1577,12 @@ const WsSubscribeDeviceStateRpc = Rpc.make(WS_METHODS.subscribeDeviceState, {
   stream: true,
 });
 
+const WsThreadSideQuestionRpc = Rpc.make(WS_METHODS.threadSideQuestion, {
+  payload: SideQuestionInput,
+  success: SideQuestionResult,
+  error: Schema.Union([SideQuestionError, EnvironmentAuthorizationError]),
+});
+
 const WsOrchestrationV2DispatchCommandRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
   payload: OrchestrationV2RpcSchemas.dispatchCommand.input,
   success: OrchestrationV2RpcSchemas.dispatchCommand.output,
@@ -2001,6 +2009,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeAuthAccessRpc,
   WsSubscribeBackgroundPolicyRpc,
   WsSubscribeResourceTelemetryRpc,
+  WsThreadSideQuestionRpc,
   WsOrchestrationV2DispatchCommandRpc,
   WsOrchestrationV2GetWorkflowScriptRpc,
   WsOrchestrationV2GetTurnItemRpc,

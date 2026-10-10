@@ -509,3 +509,27 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
     ),
   );
 });
+
+it.effect("answers side questions with tools disabled and no session persistence", () =>
+  withFakeClaudeEnv(
+    {
+      output: JSON.stringify({ structured_output: { answer: "BLUE" } }),
+      argsMustContain: "--no-session-persistence",
+      stdinMustContain: "Remember BLUE",
+      cwdMustNotBe: process.cwd(),
+    },
+    (generation) =>
+      Effect.gen(function* () {
+        const result = yield* generation.generateSideQuestion!({
+          cwd: process.cwd(),
+          modelSelection: {
+            instanceId: ProviderInstanceId.make("claude"),
+            model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+          },
+          question: "What is the marker?",
+          context: JSON.stringify([{ role: "user", text: "Remember BLUE" }]),
+        });
+        expect(result.answer).toBe("BLUE");
+      }),
+  ).pipe(Effect.provide(layerClaudeTextGenerationTest), Effect.scoped),
+);

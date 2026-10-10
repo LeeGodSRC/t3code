@@ -1,3 +1,4 @@
+import * as ThreadSideQuestion from "./orchestration-v2/ThreadSideQuestion.ts";
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
@@ -1189,6 +1190,7 @@ const layerWsRpc = (
 ) =>
   ServerWsRpcGroup.toLayer(
     Effect.gen(function* () {
+      const sideQuestions = yield* ThreadSideQuestion.ThreadSideQuestion;
       const currentSessionId = currentSession.sessionId;
       const sql = yield* SqlClient.SqlClient;
       const threadManagement = yield* ThreadManagementService.ThreadManagementService;
@@ -1813,6 +1815,7 @@ const layerWsRpc = (
       });
 
       const handlers = ServerWsRpcGroup.of({
+        [WS_METHODS.threadSideQuestion]: (input) => sideQuestions.ask(input),
         [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command) =>
           Effect.annotateCurrentSpan({
             "orchestration_v2.command_id": command.commandId,

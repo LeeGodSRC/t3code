@@ -1,7 +1,10 @@
+import { parseSideQuestion } from "@t3tools/contracts";
+import { SideQuestionSheet } from "./SideQuestionSheet";
 import type { ComposerTextPaste } from "../../native/T3ComposerEditor.types";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { useAtomValue } from "@effect/atom-react";
+import { orchestrationEnvironment } from "../../state/orchestration";
 import { clampFileAttachmentUploadBytes } from "@t3tools/client-runtime/state/attachments";
 import { pastedTextDisposition, replaceTextSelection } from "@t3tools/client-runtime/text-paste";
 import {
@@ -595,9 +598,48 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     }
     onEditorFocusChange?.(false);
   }, [onEditorFocusChange, onExpandedChange, settingsSheetPresentation.keepsComposerExpanded]);
+  const [sideQuestion, setSideQuestion] = useState<{
+    question: string;
+    threadId: string;
+    environmentId: EnvironmentId;
+  } | null>(null);
+  const canAskSideQuestion = useAtomValue(
+    orchestrationEnvironment.sideQuestion.permissionAtom(props.environmentId),
+  );
+  const sideQuestionButton =
+    selectedProviderStatus?.driver === "claudeAgent" ? (
+      <ComposerInlineControl
+        label="BTW"
+        accessibilityLabel="Ask a side question (BTW)"
+        accessibilityHint="Ask about this conversation without interrupting the task"
+        showChevron={false}
+        disabled={!canAskSideQuestion || props.connectionState !== "connected"}
+        onPress={() =>
+          setSideQuestion({
+            question: "",
+            threadId: props.selectedThread.id,
+            environmentId: props.environmentId,
+          })
+        }
+      />
+    ) : null;
   const handleSend = useCallback(
     async (followUp?: ActiveTurnComposerAction) => {
       if (voiceInput.blocksSubmission || pendingPastedTextAttachmentCountRef.current > 0) return;
+      const question = parseSideQuestion(props.draftMessage);
+      if (question !== null && !props.queuedEdit) {
+        if (props.draftAttachments.length > 0) {
+          Alert.alert("Side question", "Remove attachments before asking a side question.");
+          return;
+        }
+        setSideQuestion({
+          question,
+          threadId: props.selectedThread.id,
+          environmentId: props.environmentId,
+        });
+        onChangeDraftMessage("");
+        return;
+      }
       // Typed out in full rather than picked from the menu. Attachments mean the
       // user is sending a prompt, so those go through as usual.
       if (
@@ -631,6 +673,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     },
     [
       props.draftMessage,
+      props.queuedEdit,
       props.draftAttachments.length,
       onChangeDraftMessage,
       openUsageLimits,
@@ -1048,6 +1091,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
             ) : null}
             {!isExpanded ? (
               <View className="flex-row items-center">
+                {sideQuestionButton}
                 <ComposerDictationStartAction
                   state={voiceInput.state}
                   isAvailable={voiceInput.isAvailable}
@@ -1141,6 +1185,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                   </View>
                 )}
                 <View className="shrink-0 flex-row items-center">
+                  {!isVoiceInputPresented ? sideQuestionButton : null}
                   <ComposerDictationPrimaryAction
                     state={voiceInput.state}
                     presentation={voicePresentation}
@@ -1178,6 +1223,16 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
         ) : null}
       </Animated.View>
 
+      {sideQuestion &&
+        sideQuestion.threadId === props.selectedThread.id &&
+        sideQuestion.environmentId === props.environmentId && (
+          <SideQuestionSheet
+            environmentId={props.environmentId}
+            threadId={props.selectedThread.id}
+            initialQuestion={sideQuestion.question}
+            onClose={() => setSideQuestion(null)}
+          />
+        )}
       <VideoPreviewModal source={previewVideo} onRequestClose={closePreview} />
       <FilePreviewModal source={previewFile} onRequestClose={closePreview} />
     </Animated.View>

@@ -1,3 +1,7 @@
+import { parseSideQuestion } from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import { orchestrationEnvironment } from "../../state/orchestration";
+import { SideQuestionDialog } from "./SideQuestionDialog";
 import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
@@ -2691,6 +2695,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     }
     if (composerTrigger.kind === "slash-command") {
       const builtInSlashCommandItems = [
+        ...(activeThreadId && selectedProvider === "claudeAgent" && composerTrigger.rangeStart === 0
+          ? [
+              {
+                id: "slash:btw",
+                type: "slash-command" as const,
+                command: "btw" as const,
+                label: "/btw",
+                description: "Ask a side question without interrupting the task",
+              },
+            ]
+          : []),
         {
           id: "slash:model",
           type: "slash-command",
@@ -2724,14 +2739,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       const providerSlashCommandItems = getProviderSlashCommandsForSlashMenu(
         selectedProviderSlashCommands,
         slashMenuSkills,
-      ).map((command) => ({
-        id: `provider-slash-command:${selectedProvider}:${command.name}`,
-        type: "provider-slash-command" as const,
-        provider: selectedProvider,
-        command,
-        label: `/${command.name}`,
-        description: command.description ?? command.input?.hint ?? "Run provider command",
-      }));
+      )
+        .filter((command) => command.name.toLowerCase() !== "btw")
+        .map((command) => ({
+          id: `provider-slash-command:${selectedProvider}:${command.name}`,
+          type: "provider-slash-command" as const,
+          provider: selectedProvider,
+          command,
+          label: `/${command.name}`,
+          description: command.description ?? command.input?.hint ?? "Run provider command",
+        }));
       const query = composerTrigger.query.trim().toLowerCase();
       const skillItems = slashMenuSkills.map((skill) => ({
         id: `skill:${selectedProvider}:${skill.name}`,
@@ -4020,6 +4037,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         return;
       }
       if (item.type === "slash-command") {
+        if (item.command === "btw") {
+          applyPromptReplacement(trigger.rangeStart, trigger.rangeEnd, "/btw ", {
+            expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd),
+          });
+          setComposerHighlightedItemId(null);
+          return;
+        }
         if (item.command === "model") {
           const applied = applyPromptReplacement(trigger.rangeStart, trigger.rangeEnd, "", {
             expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd),
@@ -4224,12 +4248,38 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     showPlanFollowUpPrompt,
   ]);
 
+  const [sideQuestion, setSideQuestion] = useState<{
+    question: string;
+    threadId: ThreadId;
+    environmentId: EnvironmentId;
+  } | null>(null);
+  const canAskSideQuestion = useAtomValue(
+    orchestrationEnvironment.sideQuestion.permissionAtom(environmentId),
+  );
   const submitComposer = useCallback(
     (
       event?: { preventDefault: () => void },
       dispatchMode?: ComposerDispatchMode,
       submissionIntent?: ComposerSubmissionIntent,
     ) => {
+      const question = parseSideQuestion(promptRef.current);
+      if (question !== null) {
+        event?.preventDefault();
+        if (!activeThreadId || routeKind === "draft") {
+          setComposerSubmissionError("Start a conversation before asking a side question.");
+          return;
+        }
+        if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
+        if (composerImagesRef.current.length || composerFilesRef.current.length) {
+          setComposerSubmissionError(
+            "Side questions use conversation text. Remove attachments before asking.",
+          );
+          return;
+        }
+        setSideQuestion({ question, threadId: activeThreadId, environmentId });
+        setPrompt("");
+        return;
+      }
       if (
         noProviderAvailable ||
         isSendDisabled ||
@@ -4298,6 +4348,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       activePendingProgress,
       attachmentTargetKey,
       onTypingGuardSend,
+      routeKind,
+      composerFilesRef,
+      composerImagesRef,
+      setPrompt,
       blurMobileComposerAfterSend,
       environmentId,
       isSendDisabled,
@@ -7612,6 +7666,33 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   }
                   className="flex shrink-0 flex-nowrap items-center justify-end gap-2"
                 >
+                  {activeThreadId && routeKind !== "draft" && selectedProvider === "claudeAgent" ? (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Ask a side question (BTW)"
+                            disabled={
+                              !canAskSideQuestion || isConnecting || environmentUnavailable !== null
+                            }
+                            onClick={() =>
+                              setSideQuestion({
+                                question: "",
+                                threadId: activeThreadId,
+                                environmentId,
+                              })
+                            }
+                          />
+                        }
+                      >
+                        BTW
+                      </TooltipTrigger>
+                      <TooltipPopup>Ask a side question without interrupting the task</TooltipPopup>
+                    </Tooltip>
+                  ) : null}
                   {showComposerAttachAction ? (
                     <>
                       <input
@@ -7730,6 +7811,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           </div>
         </ComposerSurface.Main>
       </div>
+      {sideQuestion &&
+        sideQuestion.threadId === activeThreadId &&
+        sideQuestion.environmentId === environmentId && (
+          <SideQuestionDialog
+            environmentId={sideQuestion.environmentId}
+            threadId={sideQuestion.threadId}
+            initialQuestion={sideQuestion.question}
+            onClose={() => setSideQuestion(null)}
+          />
+        )}
     </form>
   );
 });
